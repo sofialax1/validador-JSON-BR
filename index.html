@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validador JSON</title>
+    <!-- Incluindo Tailwind CSS para um estilo moderno -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        /* Estilos base do modo noite */
+        .dark {
+            background-color: #121212;
+            color: #e0e0e0; /* Cor de texto por defecto do body em modo noite */
+        }
+        .dark .bg-white {
+            background-color: #1e1e1e;
+        }
+        .dark .bg-gray-50 {
+            background-color: #2c2c2c; /* Oscurecer el bloque de código en modo noche */
+        }
+        
+        /* AJUSTE CLAVE: Permite que el contenido del JSON salte de línea */
+        #json-output {
+            white-space: pre-wrap; /* Mantiene formato pero permite salto de línea */
+            word-wrap: break-word; /* Rompe palabras largas */
+        }
+
+        /* Ajuste de color de texto forzado para elementos específicos en modo noche */
+        .dark .text-black {
+            color: #ffffff; /* Asegura que el título sea blanco en modo oscuro */
+        }
+        .dark .text-gray-900 {
+             color: #ffffff; /* El título del contenido se ve blanco en modo oscuro */
+        }
+        .dark .text-gray-800 {
+            color: #a0a0a0; /* Ajuste para p de descripción en modo oscuro */
+        }
+        .dark .text-indigo-700 {
+            color: #8b5cf6; /* Morado claro para el link de subir archivo */
+        }
+
+        .dark .drop-area {
+            border-color: #444;
+        }
+        .dark .drop-area.highlight {
+            border-color: #8b5cf6; /* Morado más claro */
+            background-color: #2c2c2c;
+        }
+        .dark #json-output {
+            background-color: #000000;
+            color: #0f9; /* Verde neon para código */
+        }
+        .dark .bg-blue-50 {
+            background-color: #1a2a40;
+            border-color: #3b82f6;
+        }
+        .dark .text-blue-800, .dark .text-blue-700 {
+            color: #93c5fd;
+        }
+
+        /* Estilos de las cajas en modo noche */
+        .dark .error-box {
+            background-color: #451a1a;
+            border: 1px solid #dc2626;
+        }
+        .dark .warning-box {
+            background-color: #473615;
+            border: 1px solid #fbbf24;
+        }
+        .dark .error-group-title:hover {
+            background-color: #632323;
+        }
+        .dark .warning-group-title:hover {
+            background-color: #6d460d;
+        }
+        
+        /* Ajuste de listas para alineación perfecta */
+        ul.errors, ul.warnings {
+            list-style-type: disc;
+            /* Alinea el punto fuera del texto y permite que el texto comience uniformemente */
+            list-style-position: outside;
+            padding-left: 1.5rem; /* Ajusta la sangría de toda la lista */
+            margin-left: 0.5rem; /* Pequeño margen para separación */
+        }
+        ul.errors {
+            color: #dc2626; /* Color de texto del error */
+        }
+        ul.warnings {
+            color: #f59e0b; /* Color de texto de la advertencia */
+        }
+        
+        /* Nuevas clases para enmarcar errores y advertencias */
+        .error-box {
+            background-color: #fef2f2; /* red-50 */
+            border: 1px solid #fca5a5; /* red-300 */
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .warning-box {
+            background-color: #fffbeb; /* yellow-50 */
+            border: 1px solid #fcd34d; /* yellow-300 */
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .drop-area {
+            border: 2px dashed #9ca3af;
+            border-radius: 0.5rem;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .drop-area.highlight {
+            border-color: #4f46e5;
+            background-color: #eef2ff;
+        }
+        /* Clases de diseño específicas para los títulos de mensajes */
+        .error-title {
+            font-weight: bold;
+            color: #dc2626; /* Rojo más fuerte de Tailwind (red-600) */
+        }
+        .warning-title {
+            font-weight: bold;
+            color: #f59e0b; /* Amarillo/Ámbar de Tailwind (amber-500) */
+        }
+        .correction-text {
+            font-weight: bold;
+        }
+        .warning-group-title {
+            font-weight: bold;
+            color: #ca8a04; /* Ámbar oscuro */
+            padding: 8px 0;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .warning-group-title:hover {
+            background-color: #fef3c7; /* Color de fondo ligero al pasar el mouse */
+        }
+        /* Clases de diseño específicas para títulos de error agrupados */
+        .error-group-title {
+            font-weight: bold;
+            color: #b91c1c; /* Rojo oscuro */
+            padding: 8px 0;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .error-group-title:hover {
+            background-color: #fee2e2; /* Color de fondo ligero al pasar el mouse */
+        }
+
+        .warning-list, .error-list {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+            padding: 0 0;
+        }
+        .warning-list.open, .error-list.open {
+            max-height: 500px; /* Suficientemente grande para contener la lista */
+            padding-bottom: 1rem;
+        }
+        .chevron {
+            transition: transform 0.3s ease-out;
+        }
+        .chevron.rotated {
+            transform: rotate(90deg);
+        }
+
+        /* Estilos del Switch de Modo Oscuro */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #6875F5;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #6875F5;
+        }
+        .toggle-checkbox:checked + .toggle-label .toggle-thumb {
+            transform: translateX(100%);
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-6">
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-3xl relative">
+        <!-- Switch de Modo Oscuro -->
+        <div class="absolute top-4 right-4 flex items-center space-x-2">
+            <span class="text-sm text-gray-500 dark:text-gray-400">Modo Noturno</span>
+            <input type="checkbox" id="dark-mode-toggle" class="hidden toggle-checkbox">
+            <label for="dark-mode-toggle" class="block w-10 h-6 rounded-full bg-gray-300 cursor-pointer relative transition toggle-label">
+                <span class="block w-4 h-4 rounded-full bg-white absolute top-1 left-1 transition-transform transform toggle-thumb"></span>
+            </label>
+        </div>
+
+        <h1 class="text-3xl font-bold text-center text-black mb-4">Validador JSON</h1>
+        <p class="text-center text-gray-800 mb-2">Esta ferramenta valida a estrutura do seu arquivo JSON, verificando campos obrigatórios, tipos de dados e atribuição de valores padrão.</p>
+        <p class="text-center text-gray-800 mb-6">Carregue (ou arraste) um arquivo .json para validar a estrutura, tipos de dados e obter uma análise.</p>
+        
+        <!-- Área de Drag and Drop -->
+        <div id="drop-area" class="drop-area mb-6">
+            <p class="text-gray-500 dark:text-gray-400">Arraste e solte o arquivo JSON aqui, ou</p>
+            <label for="json-file-input" class="inline-block text-sm font-semibold text-indigo-700 mt-2 cursor-pointer hover:underline">
+                Selecionar arquivo JSON
+            </label>
+            <input type="file" id="json-file-input" accept=".json" class="hidden">
+        </div>
+        
+        <div id="status-message" class="text-center font-medium mb-4 text-sm"></div>
+
+        <!-- Resumen Ejecutivo -->
+        <div id="summary-section" class="bg-blue-50 border border-blue-200 p-4 rounded-lg mb-6 hidden">
+            <h2 class="text-lg font-semibold text-blue-800 mb-2">Resumo Executivo</h2>
+            <div id="analysis-summary" class="text-sm text-blue-700"></div>
+        </div>
+
+        <!-- Contenedor de Botones de Acción -->
+        <div id="action-buttons" class="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-3 mb-6 hidden">
+            <button id="correct-warnings-btn" class="bg-yellow-500 text-white font-bold py-2 px-4 rounded-full shadow-md hover:bg-yellow-600 transition duration-150 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-8a1 1 0 102 0V7a1 1 0 10-2 0v3zm0 4a1 1 0 102 0v-1a1 1 0 10-2 0v1z" clip-rule="evenodd" /></svg>
+                Corrigir Avisos (Atribuir Padrões)
+            </button>
+            <button id="download-json-btn" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-full shadow-md hover:bg-indigo-700 transition duration-150 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L10 11.586l1.293-1.293a1 1 0 111.414 1.414l-2 2a1 1 0 01-1.414 0l-2-2a1 1 0 010-1.414z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M10 2a1 1 0 011 1v10a1 1 0 11-2 0V3a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                Baixar JSON Corrigido (.json)
+            </button>
+        </div>
+
+
+        <div class="bg-gray-50 p-4 rounded-lg">
+            <h2 class="text-lg font-semibold text-gray-600 mb-2 dark:text-gray-500">Conteúdo do Arquivo:</h2>
+            <pre id="json-output"></pre>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const jsonFileInput = document.getElementById('json-file-input');
+            const jsonOutput = document.getElementById('json-output');
+            const statusMessage = document.getElementById('status-message');
+            const dropArea = document.getElementById('drop-area');
+            const summarySection = document.getElementById('summary-section');
+            const analysisSummary = document.getElementById('analysis-summary');
+            const actionButtons = document.getElementById('action-buttons');
+            const correctWarningsBtn = document.getElementById('correct-warnings-btn');
+            const downloadJsonBtn = document.getElementById('download-json-btn');
+            const darkModeToggle = document.getElementById('dark-mode-toggle');
+
+            let currentParsedData = null; // Almacena el JSON válido para corrección/descarga
+
+            // --- Lógica de Modo Oscuro (NUEVO) ---
+            const body = document.body;
+            const toggleThumb = document.querySelector('.toggle-thumb');
+            
+            // Função para aplicar ou quitar el modo oscuro
+            const toggleDarkMode = (isDark) => {
+                if (isDark) {
+                    body.classList.add('dark');
+                    localStorage.setItem('theme', 'dark');
+                    toggleThumb.style.transform = 'translateX(100%)';
+                } else {
+                    body.classList.remove('dark');
+                    localStorage.setItem('theme', 'light');
+                    toggleThumb.style.transform = 'translateX(0)';
+                }
+                darkModeToggle.checked = isDark;
+            };
+
+            // Comprobar la preferencia almacenada al cargar
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            
+            if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+                toggleDarkMode(true);
+            } else {
+                // Asegura que el estado inicial sea light si no hay preferencia oscura
+                toggleDarkMode(false);
+            }
+
+
+            // Listener del switch
+            darkModeToggle.addEventListener('change', () => {
+                toggleDarkMode(darkModeToggle.checked);
+            });
+            // --- Fin Lógica de Modo Oscuro ---
+
+
+            const isValueEmpty = (value) => {
+                return value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
+            };
+
+            const setStatusMessage = (message, colorClass) => {
+                statusMessage.innerHTML = message;
+                statusMessage.className = `text-center font-medium mb-4 text-sm ${colorClass}`;
+            };
+
+            // --- Lógica de Drag and Drop (Punto 1c) ---
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
+            });
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => dropArea.classList.add('highlight'), false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => dropArea.classList.remove('highlight'), false);
+            });
+
+            dropArea.addEventListener('drop', handleDrop, false);
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                if (files.length) {
+                    // Simula la selección manual del archivo para mantener la lógica existente
+                    jsonFileInput.files = files;
+                    jsonFileInput.dispatchEvent(new Event('change'));
+                }
+            }
+            // --- Fin Lógica de Drag and Drop ---
+
+            // Función de ayuda para calcular el resumen (Punto 3a)
+            const calculateSummary = (data) => {
+                const isDevelopmentByPubType = data.publicacion?.tipoDePublicacion === "Desarrollo" || data.publicacion?.tipoDePublicacion === "DEVELOPMENT";
+                const hasUnits = Array.isArray(data.unidades) && data.unidades.length > 0;
+                // Definición ampliada: es desarrollo si el tipo lo dice O si tiene unidades
+                const isDevelopment = isDevelopmentByPubType || hasUnits; 
+                
+                // Definición de numUnits para evitar ReferenceError
+                const numUnits = isDevelopment && Array.isArray(data.unidades) ? data.unidades.length : 0; 
+                
+                // Determinar el tipo de aviso (CORREGIDO: Eliminar el paréntesis en Clasificado)
+                const tipoAviso = isDevelopment ? "Empreendimento/Desenvolvimento" : "Classificado";
+
+                let multimedia = {
+                    images: data.multimedia?.imagenes?.length || 0,
+                    plans: data.multimedia?.planos?.length || 0,
+                    videos: data.multimedia?.videos?.length || 0,
+                    recorridos360: data.multimedia?.recorridos360?.length || 0,
+                };
+
+                let summary = `
+                    <p><strong>Tipo de Anúncio:</strong> ${tipoAviso}</p>
+                    <p><strong>Plano de Publicação:</strong> ${data.publicacion?.tipoDePublicacion || 'SIMPLES (Padrão)'}</p>
+                    ${isDevelopment ? `<p><strong>Unidades Validadas:</strong> ${numUnits}</p>` : ''}
+                    <p><strong>Total de Características:</strong> ${data.caracteristicas?.length || 0}</p>
+                    <p><strong>Multimídia:</strong></p>
+                    <ul class="ml-4 list-disc list-inside">
+                        <li>Imagens: ${multimedia.images}</li>
+                        <li>Plantas: ${multimedia.plans}</li>
+                        <li>Vídeos/360: ${multimedia.videos + multimedia.recorridos360}</li>
+                    </ul>
+                `;
+                return summary;
+            };
+
+
+            const validateTypes = (data, schema, path = '') => {
+                const warnings = [];
+
+                for (const key in schema) {
+                    const currentPath = path ? `${path}.${key}` : key;
+                    if (data && key in data) {
+                        const expectedType = schema[key];
+                        const actualType = Array.isArray(data[key]) ? 'array' : typeof data[key];
+
+                        if (actualType !== expectedType) {
+                            if (
+                                (expectedType === 'string' && (actualType === 'number' || actualType === 'boolean')) ||
+                                (expectedType === 'number' && actualType === 'string' && !isNaN(Number(data[key])))
+                            ) {
+                                warnings.push(`O campo '${currentPath}' era esperado como '${expectedType}' mas foi encontrado como '${actualType}'.`);
+                            } else if (expectedType === 'object' && actualType === 'object' && typeof schema[key] === 'object' && !Array.isArray(schema[key])) {
+                                warnings.push(...validateTypes(data[key], schema[key], currentPath));
+                            } else if (expectedType === 'array' && actualType === 'object' && Array.isArray(data[key])) { // Caso array
+                                if (data[key].length > 0) {
+                                    const arraySchema = schema[key][0]; // Asume que el esquema de array es para el primer elemento
+                                    if (typeof arraySchema === 'object') {
+                                        warnings.push(...validateTypes(data[key][0], arraySchema, currentPath + '[0]'));
+                                    }
+                                }
+                            }
+                        } else if (actualType === 'object' && typeof schema[key] === 'object' && !Array.isArray(schema[key])) {
+                            warnings.push(...validateTypes(data[key], schema[key], currentPath));
+                        } else if (actualType === 'array' && Array.isArray(data[key])) {
+                            if (data[key].length > 0) {
+                                const arraySchema = schema[key][0];
+                                if (typeof arraySchema === 'object') {
+                                    warnings.push(...validateTypes(data[key][0], arraySchema, currentPath + '[0]'));
+                                }
+                            }
+                        }
+                    }
+                }
+                return warnings;
+            };
+            
+            const validateJSON = (data, isUnit = false, unitIndex = null) => {
+                const errors = [];
+                const warnings = [];
+                const caracteristicasWarnings = [];
+                const multimediaUbicacionWarnings = []; // Agrupación 2
+                const publicacionTipoWarnings = []; // Agrupación 3
+                
+                const caracteristicasErrors = []; // Errores agrupados de características
+                const preciosErrors = []; // Errores agrupados de precios
+
+                const prefix = isUnit ? `Unidade ${unitIndex + 1}: ` : '';
+
+                const requiredKeys = [
+                    "descripcion",
+                    "tipoDePropiedad",
+                    "localizacion",
+                    "precios",
+                    "publicador",
+                    "codigoAviso",
+                    // "titulo" SE MUEVE A WARNING
+                ];
+
+                // Validar campos obligatorios de nivel superior (Errores No Agrupados)
+                for (const key of requiredKeys) {
+                    // Aquí solo chequeamos los campos simples
+                    if (key !== 'precios' && key !== 'tipoDePropiedad' && key !== 'localizacion' && key !== 'publicador') {
+                        if (!(key in data) || isValueEmpty(data[key])) {
+                            errors.push(`${prefix}O campo obrigatório '${key}' não existe ou está vazio.`);
+                        }
+                    }
+                }
+                
+                // VALIDACIÓN DE TÍTULO (Mover a WARNINGS)
+                if (!(data.titulo) || isValueEmpty(data.titulo)) {
+                     publicacionTipoWarnings.push(`${prefix}O campo 'titulo' não existe ou está vazio. O anúncio pode aparecer sem título.`);
+                } else if (data.titulo.length > 100) {
+                    publicacionTipoWarnings.push(`${prefix}O campo 'titulo' tem mais de 100 caracteres. <span class="correction-text">Correção:</span> Será truncado para 100 caracteres.`);
+                }
+
+
+                // Validar campos anidados (Errores No Agrupados)
+                if (data.tipoDePropiedad) {
+                    if (!('idTipo' in data.tipoDePropiedad) || isValueEmpty(data.tipoDePropiedad.idTipo)) {
+                        errors.push(`${prefix}A chave obrigatória 'idTipo' dentro de 'tipoDePropiedad' não existe ou está vazia.`);
+                    }
+                } else {
+                    errors.push(`${prefix}A chave obrigatória 'tipoDePropiedad' não existe.`);
+                }
+
+                if (data.localizacion) {
+                    const hasIdUbicacion = 'idUbicacion' in data.localizacion && !isValueEmpty(data.localizacion.idUbicacion);
+                    const idUbicacionValue = data.localizacion.idUbicacion || '';
+
+                    // NUEVA VALIDACIÓN: idUbicacion no debe contener minúsculas
+                    if (hasIdUbicacion && /[a-z]/.test(idUbicacionValue)) {
+                         errors.push(`${prefix}O campo 'idUbicacion' contém letras minúsculas. O formato de 'idUbicacion' deve ser apenas em maiúsculas.`);
+                    }
+
+                    const hasLatLon = 'latitud' in data.localizacion && !isValueEmpty(data.localizacion.latitud) && 'longitud' in data.localizacion && !isValueEmpty(data.localizacion.longitud);
+                    
+                    if (!hasIdUbicacion && !hasLatLon) {
+                        errors.push(`${prefix}O objeto 'localizacion' deve conter 'idUbicacion' ou 'latitud' e 'longitud' com valores não vazios.`);
+                    }
+                    
+                    // Advertencia: Campo 'direccion' no debe estar vacío (Agrupación 2)
+                    if (!('direccion' in data.localizacion) || isValueEmpty(data.localizacion.direccion)) {
+                         multimediaUbicacionWarnings.push(`${prefix}O campo 'direccion' em 'localizacion' está vazio. É importante para a localização.`);
+                    }
+                    
+                } else {
+                    errors.push(`${prefix}A chave obrigatória 'localizacion' não existe.`);
+                }
+                
+                if (data.publicador) {
+                    if (!('codigoInmobiliaria' in data.publicador) || isValueEmpty(data.publicador.codigoInmobiliaria)) {
+                        errors.push(`${prefix}A chave obrigatória 'codigoInmobiliaria' dentro de 'publicador' não existe ou está vazia.`);
+                    }
+                    // Advertencia: emailAsesor vacío (Agrupación 3)
+                    if (!('emailAsesor' in data.publicador) || isValueEmpty(data.publicador.emailAsesor)) {
+                        publicacionTipoWarnings.push(`${prefix}O campo 'emailAsesor' em 'publicador' está vazio. <span class="correction-text">Correção:</span> Será atribuído 'Administrador' como padrão.`);
+                    }
+                } else {
+                    errors.push(`${prefix}A chave obrigatória 'publicador' não existe.`);
+                }
+
+                // Advertencia: tipoDePublicacion vacío (Agrupación 3)
+                if (data.publicacion && 'tipoDePublicacion' in data.publicacion && isValueEmpty(data.publicacion.tipoDePublicacion)) {
+                    publicacionTipoWarnings.push(`${prefix}O campo 'tipoDePublicacion' está vazio. <span class="correction-text">Correção:</span> Será atribuído por padrão o valor 'SIMPLE'.`);
+                }
+                
+                
+                // Validar caracteristicas (Agrupación 1 - Warnings y Errores)
+                if (data.caracteristicas && Array.isArray(data.caracteristicas)) {
+                    data.caracteristicas.forEach((caracteristica, index) => {
+                        // ERROR: Nombre obligatorio (Agrupación de Errores)
+                        if (!('nombre' in caracteristica) || isValueEmpty(caracteristica.nombre)) {
+                            caracteristicasErrors.push(`${prefix}O campo 'nombre' na característica #${index + 1} é obrigatório e não pode estar vazio.`);
+                        }
+                        
+                        // WARNING: idValor no obligatorio (Agrupación 1 - Warnings)
+                        if (!('idValor' in caracteristica) || isValueEmpty(caracteristica.idValor)) {
+                             const nombreCaracteristica = caracteristica.nombre || `Sem nome (Índice ${index + 1})`;
+                             caracteristicasWarnings.push(`${prefix}A característica '${nombreCaracteristica}' não tem 'idValor'. <span class="correction-text">Correção:</span> Será atribuído '0' como valor padrão.`);
+                        }
+                    });
+                }
+
+
+                // Validar campos de arrays de precios (Agrupación de Errores)
+                const prices = data.precios;
+                // Modificación para ser más explícitos si el campo falta o si está vacío
+                if (!('precios' in data)) {
+                    errors.push(`${prefix}Falta o campo obrigatório de array 'precios'.`);
+                } else if (!Array.isArray(prices) || prices.length === 0) {
+                    errors.push(`${prefix}O array 'precios' existe, mas está vazio. O anúncio não tem preços, portanto não será publicado.`);
+                } else {
+                    prices.forEach((price, index) => {
+                        if (!('monto' in price) || isValueEmpty(price.monto)) {
+                             preciosErrors.push(`${prefix}No preço #${index + 1}, a chave 'monto' é obrigatória e está vazia.`);
+                        }
+                        if (!('operacion' in price) || isValueEmpty(price.operacion)) {
+                            preciosErrors.push(`${prefix}No preço #${index + 1}, a chave 'operacion' é obrigatória e está vazia.`);
+                        }
+                        // Advertencia para moneda
+                        if (!('moneda' in price) || isValueEmpty(price.moneda)) {
+                            warnings.push(`${prefix}O campo 'moneda' está vazio. <span class="correction-text">Correção:</span> Será atribuída a moeda padrão.`);
+                        }
+                    });
+                }
+                
+                // Validar multimedia (planos e imágenes) (Agrupación 2 - Warnings)
+                if (data.multimedia) {
+                    // Advertencia por falta de planos
+                    if (!data.multimedia.planos || (Array.isArray(data.multimedia.planos) && data.multimedia.planos.length === 0)) {
+                        multimediaUbicacionWarnings.push(`O anúncio não tem plantas.`);
+                    }
+                    // Advertencia por falta de imágenes (ya existía)
+                    if (!data.multimedia.imagenes || (Array.isArray(data.multimedia.imagenes) && data.multimedia.imagenes.length === 0)) {
+                        multimediaUbicacionWarnings.push(`O anúncio não possui imagens.`);
+                    }
+                }
+                
+                // --- Ensamblar ERRORES Agrupados ---
+                
+                const groupedErrors = [];
+                
+                // Errores de Precios
+                if (preciosErrors.length > 0) {
+                    groupedErrors.push({
+                        title: `Preços (Valor ou Operação)`,
+                        items: preciosErrors,
+                        type: 'errors'
+                    });
+                }
+                
+                // Errores de Características
+                if (caracteristicasErrors.length > 0) {
+                    groupedErrors.push({
+                        title: `Características (nome)`,
+                        items: caracteristicasErrors,
+                        type: 'errors'
+                    });
+                }
+
+
+                // --- Ensamblar Warnings Agrupados ---
+                
+                const groupedWarnings = [];
+
+                // 3. Publicación y Tipos
+                if (publicacionTipoWarnings.length > 0) {
+                    groupedWarnings.push({
+                        title: `Publicação e Tipos (emailAsesor, titulo, tipoDePublicacion)`,
+                        items: publicacionTipoWarnings,
+                        type: 'warnings'
+                    });
+                }
+
+                // 2. Ubicación y Multimedia
+                if (multimediaUbicacionWarnings.length > 0) {
+                    groupedWarnings.push({
+                        title: `Localização e Multimídia (direccion, planos, imágenes)`,
+                        items: multimediaUbicacionWarnings,
+                        type: 'warnings'
+                    });
+                }
+                
+                // 1. Características
+                if (caracteristicasWarnings.length > 0) {
+                    groupedWarnings.push({
+                        title: `Características (idValor)`,
+                        items: caracteristicasWarnings,
+                        type: 'warnings'
+                    });
+                }
+                
+                // Devolver errores no agrupados, y luego los arrays de objetos agrupados
+                return { errors: errors.concat(groupedErrors), warnings: warnings.concat(groupedWarnings) };
+            };
+            
+            // Función para renderizar el desglose de ERRORES
+            const renderGroupedErrors = (groupedErrors) => {
+                let html = '';
+                groupedErrors.forEach((group, index) => {
+                    const listId = `error-list-${index}`;
+                    const chevronId = `error-chevron-${index}`;
+                    
+                    html += `
+                        <div class="border-t border-red-200 dark:border-red-800">
+                            <div class="error-group-title" role="button" aria-expanded="false" aria-controls="${listId}" data-target="#${listId}" data-chevron="#${chevronId}">
+                                <span>Erros Agrupados: ${group.title}</span>
+                                <svg id="${chevronId}" class="chevron w-4 h-4 text-red-700" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10l-3.293-3.293a1 1 0 111.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div id="${listId}" class="error-list">
+                                <ul class="errors">
+                                    ${group.items.map(item => `<li>${item}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                });
+                return html;
+            }
+            
+            // Función para renderizar el desglose de WARNINGS
+            const renderGroupedWarnings = (groupedWarnings) => {
+                let html = '';
+                groupedWarnings.forEach((group, index) => {
+                    const listId = `warning-list-${index}`;
+                    const chevronId = `chevron-${index}`;
+                    
+                    html += `
+                        <div class="border-t border-yellow-200 dark:border-yellow-800">
+                            <div class="warning-group-title" role="button" aria-expanded="false" aria-controls="${listId}" data-target="#${listId}" data-chevron="#${chevronId}">
+                                <span>Avisos Agrupados: ${group.title}</span>
+                                <svg id="${chevronId}" class="chevron w-4 h-4 text-yellow-700" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10l-3.293-3.293a1 1 0 111.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div id="${listId}" class="warning-list">
+                                <ul class="warnings">
+                                    ${group.items.map(item => `<li>${item}</li>`).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                });
+                return html;
+            }
+            
+            // Función para inicializar listeners del desglose (ERRORS y WARNINGS)
+            const initAccordionListeners = () => {
+                document.querySelectorAll('.warning-group-title, .error-group-title').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const targetSelector = button.getAttribute('data-target');
+                        const chevronSelector = button.getAttribute('data-chevron');
+                        const targetList = document.querySelector(targetSelector);
+                        const chevron = document.querySelector(chevronSelector);
+                        
+                        // Cierra o abre el acordeón
+                        if (targetList.classList.contains('open')) {
+                            targetList.classList.remove('open');
+                            button.setAttribute('aria-expanded', 'false');
+                            chevron.classList.remove('rotated');
+                        } else {
+                            targetList.classList.add('open');
+                            button.setAttribute('aria-expanded', 'true');
+                            chevron.classList.add('rotated');
+                        }
+                    });
+                });
+            }
+
+
+            const processFile = (file) => {
+                if (!file) {
+                    setStatusMessage('Nenhum arquivo foi selecionado.', 'text-gray-500');
+                    jsonOutput.textContent = '';
+                    actionButtons.classList.add('hidden');
+                    summarySection.classList.add('hidden');
+                    return;
+                }
+
+                if (file.type !== 'application/json') {
+                    setStatusMessage('Erro: Por favor, carregue um arquivo .json válido.', 'text-red-600');
+                    jsonOutput.textContent = '';
+                    actionButtons.classList.add('hidden');
+                    summarySection.classList.add('hidden');
+                    return;
+                }
+
+                const reader = new FileReader();
+
+                reader.onload = (e) => {
+                    const fileContent = e.target.result;
+                    currentParsedData = null; // Reiniciar
+                    let allErrors = [];
+                    let generalWarnings = [];
+                    let groupedErrors = []; // Almacenará objetos {title, items}
+                    let groupedWarnings = []; // Almacenará objetos {title, items}
+
+                    try {
+                        let parsedData = JSON.parse(fileContent);
+
+                        const primaryResult = validateJSON(parsedData);
+                        
+                        // Define isDevelopment based on EITHER pub type OR units presence (FIX)
+                        const isDevelopmentByPubType = parsedData.publicacion?.tipoDePublicacion === "Desarrollo" || parsedData.publicacion?.tipoDePublicacion === "DEVELOPMENT";
+                        const hasUnits = Array.isArray(parsedData.unidades) && parsedData.unidades.length > 0;
+                        const isDevelopment = isDevelopmentByPubType || hasUnits; // Definición ampliada
+
+                        // NEW WARNING: Si hay unidades pero el tipo de publicación no está marcado como Desarrollo (Inferencia)
+                        if (hasUnits && !isDevelopmentByPubType) {
+                            generalWarnings.push("AVISO DE INFERÊNCIA: O arquivo contém 'unidades', mas o campo 'tipoDePublicacion' não está em 'Desarrollo' ou 'DEVELOPMENT'. A validação será executada como Empreendimento, mas é recomendável corrigir o campo 'tipoDePublicacion'.");
+                        }
+
+
+                        // Separar los errores y warnings generales de los agrupados
+                        allErrors = primaryResult.errors.filter(e => typeof e === 'string');
+                        groupedErrors = primaryResult.errors.filter(e => typeof e === 'object');
+                        
+                        generalWarnings = primaryResult.warnings.filter(w => typeof w === 'string');
+                        groupedWarnings = primaryResult.warnings.filter(w => typeof w === 'object');
+
+                        // Validación para tipo de publicación 'Desarrollo' (usa la definición ampliada)
+                        if (isDevelopment) {
+                            if (!('unidades' in parsedData) || !Array.isArray(parsedData.unidades) || parsedData.unidades.length === 0) {
+                                // Este error solo debería ocurrir si hasUnits es falso, pero isDevelopment es true (lo cual es redundante, pero mantiene el check de array vacío)
+                                allErrors.push("O tipo de publicação é 'Empreendimento/Desenvolvimento' mas o array 'unidades' está vazio.");
+                            } else {
+                                if (!('fechaEntrega' in parsedData) || isValueEmpty(parsedData.fechaEntrega)) {
+                                    allErrors.push("O tipo de publicação é 'Empreendimento/Desenvolvimento' mas o campo 'fechaEntrega' não existe ou está vazio.");
+                                }
+                                parsedData.unidades.forEach((unit, index) => {
+                                    const unitResult = validateJSON(unit, true, index);
+                                    
+                                    // Concatenar resultados de unidad
+                                    allErrors = allErrors.concat(unitResult.errors.filter(e => typeof e === 'string'));
+                                    groupedErrors = groupedErrors.concat(unitResult.errors.filter(e => typeof e === 'object'));
+                                    
+                                    generalWarnings = generalWarnings.concat(unitResult.warnings.filter(w => typeof w === 'string'));
+                                    groupedWarnings = groupedWarnings.concat(unitResult.warnings.filter(w => typeof w === 'object'));
+                                });
+                            }
+                        }
+                        
+                        // Validación de tipos de datos (Warnings Generales)
+                        const typeSchema = {
+                            "claveReferencia": "string", "titulo": "string", "descripcion": "string",
+                            "estado": "string", "etapaDesarrollo": "string", "fechaEntrega": "string",
+                            "localizacion": {
+                                "codigoPostal": "string", "direccion": "string", "idUbicacion": "string", "latitud": "string", "longitud": "string", "muestraMapa": "string", "ubicacion": "string"
+                            },
+                            "caracteristicas": [{"id": "string", "idValor": "string", "nombre": "string", "valor": "string"}],
+                            "multimedia": {
+                                "imagenes": ["object"], "planos": ["object"], "recorridos360": ["object"], "videos": ["object"]
+                            },
+                            "precios": [{"monto": "string", "moneda": "string", "operacion": "string"}],
+                            "publicacion": {
+                                "fechaOffline": "string", "fechaOnline": "string", "tipoDePublicacion": "string"
+                            },
+                            "publicador": {
+                                "callbackTokenClient": "string", "codigoInmobiliaria": "string", "emailAsesor": "string", "emailDeContacto": "string", "nombreDeContacto": "string", "telefonoDeContacto": "string"
+                            },
+                            "tipoDePropiedad": {
+                                "idSubTipo": "string", "idTipo": "string", "subTipo": "string", "tipo": "string"
+                            },
+                            "unidades": [{"object": "object"}],
+                            "urlLogo": "string"
+                        };
+                        const typeWarnings = validateTypes(parsedData, typeSchema);
+                        generalWarnings = generalWarnings.concat(typeWarnings);
+                        
+                        // --- Reportar y mostrar acciones ---
+                        const summaryHTML = calculateSummary(parsedData);
+                        analysisSummary.innerHTML = summaryHTML;
+                        summarySection.classList.remove('hidden');
+
+                        if (allErrors.length > 0 || groupedErrors.length > 0 || generalWarnings.length > 0 || groupedWarnings.length > 0) {
+                            let message = '';
+                            
+                            // 1. Mostrar Errores
+                            if (allErrors.length > 0 || groupedErrors.length > 0) {
+                                message += '<div class="error-box">';
+                                message += '<span class="error-title">Os seguintes erros foram encontrados</span>:<br>';
+                                
+                                // Errores Generales (no agrupados)
+                                if (allErrors.length > 0) {
+                                    message += '<ul class="errors">' + allErrors.map(e => `<li>${e}</li>`).join('') + '</ul>';
+                                }
+                                // Errores Agrupados (Desglose)
+                                message += renderGroupedErrors(groupedErrors);
+                                message += '</div>'; // Cerrar error-box
+                            }
+                            
+                            // 2. Mostrar Advertencias
+                            if (generalWarnings.length > 0 || groupedWarnings.length > 0) {
+                                message += '<div class="warning-box">';
+                                message += '<span class="warning-title">Os seguintes avisos foram encontrados</span>:<br>';
+                                
+                                // Advertencias Generales (no agrupadas)
+                                if (generalWarnings.length > 0) {
+                                     message += '<ul class="warnings mb-4">' + generalWarnings.map(w => `<li>${w}</li>`).join('') + '</ul>';
+                                }
+                                
+                                // Advertencias Agrupadas (Desglose)
+                                message += renderGroupedWarnings(groupedWarnings);
+                                message += '</div>'; // Cerrar warning-box
+                                
+                                // Inicializar listeners del accordion
+                                setTimeout(initAccordionListeners, 0); 
+                            }
+
+                            if (allErrors.length > 0 || groupedErrors.length > 0) {
+                                setStatusMessage(message, 'text-left'); // Se retira colorClass ya que el color lo maneja el box
+                                jsonOutput.textContent = 'O arquivo tem ERROS críticos. Revise a lista de erros para continuar.';
+                                actionButtons.classList.add('hidden');
+                            } else {
+                                setStatusMessage(message, 'text-left');
+                                currentParsedData = parsedData;
+                                actionButtons.classList.remove('hidden');
+                                correctWarningsBtn.classList.remove('hidden');
+                                downloadJsonBtn.classList.remove('hidden');
+
+                                const formattedJson = JSON.stringify(parsedData, null, 2);
+                                jsonOutput.textContent = formattedJson;
+                            }
+                        } else {
+                            const formattedJson = JSON.stringify(parsedData, null, 2);
+                            jsonOutput.textContent = formattedJson;
+                            setStatusMessage('Arquivo JSON carregado e validado com sucesso. A estrutura está correta.', 'text-green-600');
+                            currentParsedData = parsedData;
+                            actionButtons.classList.remove('hidden');
+                            correctWarningsBtn.classList.add('hidden'); 
+                            downloadJsonBtn.classList.remove('hidden');
+                        }
+
+                    } catch (error) {
+                        setStatusMessage('Erro: O arquivo não é um JSON válido.', 'text-red-600');
+                        jsonOutput.textContent = '';
+                        actionButtons.classList.add('hidden');
+                        summarySection.classList.add('hidden');
+                        console.error('Erro ao analisar o JSON:', error);
+                    }
+                };
+                reader.readAsText(file);
+            };
+
+            jsonFileInput.addEventListener('change', (event) => {
+                processFile(event.target.files[0]);
+            });
+
+
+            // --- Lógica de Corregir Advertencias (Punto 1b) ---
+            const applyCorrections = (data) => {
+                // 1. Corregir publicador.emailAsesor (si está vacío)
+                if (data.publicador && isValueEmpty(data.publicador.emailAsesor)) {
+                    data.publicador.emailAsesor = "Administrador";
+                }
+
+                // 2. Corregir publicacion.tipoDePublicacion (si está vacío)
+                if (data.publicacion && isValueEmpty(data.publicacion.tipoDePublicacion)) {
+                    // Si inferimos que es desarrollo por las unidades, no lo corregimos a SIMPLE aquí
+                    const isDevelopmentByUnits = Array.isArray(data.unidades) && data.unidades.length > 0;
+                    if (!isDevelopmentByUnits) {
+                        data.publicacion.tipoDePublicacion = "SIMPLE";
+                    } else {
+                        // Si tiene unidades, pero el campo estaba vacío, lo corregimos a Desarrollo para consistencia futura
+                        data.publicacion.tipoDePublicacion = "Desarrollo"; 
+                    }
+                }
+                
+                // 3. Corregir titulo (si es > 100 caracteres)
+                if (data.titulo && data.titulo.length > 100) {
+                    data.titulo = data.titulo.substring(0, 100);
+                }
+
+                // 4. Corregir caracteristicas[].idValor (si está vacío)
+                if (Array.isArray(data.caracteristicas)) {
+                    data.caracteristicas.forEach(c => {
+                        if (isValueEmpty(c.idValor)) {
+                            c.idValor = "0";
+                        }
+                    });
+                }
+
+                // 5. Corregir precios[].moneda (si está vacío)
+                if (Array.isArray(data.precios)) {
+                    data.precios.forEach(p => {
+                        if (isValueEmpty(p.moneda)) {
+                            // Suponemos una moneda por defecto común, ej., 'USD' o 'BRL'
+                            p.moneda = "BRL"; 
+                        }
+                    });
+                }
+
+                // 6. Aplicar correcciones a unidades si es Desarrollo
+                const isDevelopment = data.publicacion?.tipoDePublicacion === "Desarrollo" || data.publicacion?.tipoDePublicacion === "DEVELOPMENT";
+                if (isDevelopment && Array.isArray(data.unidades)) {
+                    data.unidades.forEach(unit => applyCorrections(unit));
+                }
+                
+                return data;
+            };
+
+            correctWarningsBtn.addEventListener('click', () => {
+                if (currentParsedData) {
+                    const correctedData = applyCorrections(JSON.parse(JSON.stringify(currentParsedData))); // Clonar para modificar
+                    
+                    // Volver a validar para confirmar que las advertencias desaparecieron
+                    const validationResult = validateJSON(correctedData);
+                    
+                    if (validationResult.errors.length > 0) {
+                         // Esto no debería pasar si las correcciones son correctas, pero es un fallback
+                         setStatusMessage('Erro: A correção automática introduziu ou não resolveu erros críticos.', 'text-red-600');
+                    } else if (validationResult.warnings.length === 0) {
+                        currentParsedData = correctedData; // Sobrescribir con el JSON corregido
+                        jsonOutput.textContent = JSON.stringify(currentParsedData, null, 2);
+                        setStatusMessage('Arquivo JSON carregado e validado com sucesso. A estrutura está correta.', 'text-green-600');
+                        correctWarningsBtn.classList.add('hidden'); // Ocultar el botón
+                    } else {
+                        // Si quedan advertencias (las que no tienen corrección auto), simplemente actualizar
+                        currentParsedData = correctedData;
+                        jsonOutput.textContent = JSON.stringify(currentParsedData, null, 2);
+                        setStatusMessage('Avisos corrigidos. Ainda restam avisos informativos (sem correção automática).', 'text-yellow-600');
+                    }
+                }
+            });
+
+
+            // --- Lógica de Descargar JSON (Punto 3c) ---
+            downloadJsonBtn.addEventListener('click', () => {
+                if (currentParsedData) {
+                    const dataStr = JSON.stringify(currentParsedData, null, 2);
+                    const blob = new Blob([dataStr], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'arquivo_validado.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    setStatusMessage('Arquivo JSON baixado corretamente.', 'text-green-600');
+                } else {
+                    setStatusMessage('Erro: Não há dados válidos para baixar.', 'text-red-600');
+                }
+            });
+
+        });
+    </script>
+</body>
+</html>
