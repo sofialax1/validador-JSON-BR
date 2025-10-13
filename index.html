@@ -82,16 +82,16 @@
         /* Ajuste de listas para alineación perfecta */
         ul.errors, ul.warnings {
             list-style-type: disc;
-            /* Alinea el punto fuera del texto y permite que el texto comience uniformemente */
+            /* Alinea el punto fuera del texto y permite que el texto comece uniformemente */
             list-style-position: outside;
             padding-left: 1.5rem; /* Ajusta la sangría de toda la lista */
             margin-left: 0.5rem; /* Pequeño margen para separación */
         }
         ul.errors {
-            color: #dc2626; /* Color de texto del error */
+            color: #dc2626; /* Cor de texto del error */
         }
         ul.warnings {
-            color: #f59e0b; /* Color de texto de la advertencia */
+            color: #f59e0b; /* Cor de texto de la advertencia */
         }
         
         /* Nuevas clases para enmarcar errores y advertencias */
@@ -240,6 +240,7 @@
         </div>
 
         <h1 class="text-3xl font-bold text-center text-black mb-4">Validador JSON</h1>
+        <p class="text-center text-gray-800 mb-2">Esta ferramenta valida a estrutura do seu arquivo JSON, verificando campos obrigatórios, tipos de dados e atribuição de valores padrão.</p>
         <p class="text-center text-gray-800 mb-6">Carregue (ou arraste) um arquivo .json para validar a estrutura, tipos de dados e obter uma análise.</p>
         
         <!-- Área de Drag and Drop -->
@@ -285,7 +286,7 @@
 
 
         <div class="bg-gray-50 p-4 rounded-lg">
-            <h2 class="text-lg font-semibold text-black mb-2 dark:text-gray600">Conteúdo do Arquivo:</h2>
+            <h2 class="text-lg font-semibold text-gray-600 mb-2 dark:text-white">Conteúdo do Arquivo:</h2>
             <pre id="json-output"></pre>
         </div>
     </div>
@@ -447,7 +448,7 @@
                 
                 // --- MOSTRAR NOMBRE DEL ARCHIVO EN DROP-AREA (NUEVO) ---
                 dropMessageContent.innerHTML = `
-                    <p class="text-blue-600 font-semibold"> ${file.name}</p>
+                    <p class="text-green-600 font-semibold">Arquivo: ${file.name}</p>
                     <p class="text-gray-500 dark:text-gray-400">Carregado com sucesso. Clique em 'Analisar Arquivo' para iniciar.</p>
                 `;
                 // ----------------------------------------------------
@@ -861,9 +862,11 @@
             // Función para renderizar el desglose de WARNINGS
             const renderGroupedWarnings = (groupedWarnings) => {
                 let html = '';
+                
                 groupedWarnings.forEach((group, index) => {
                     const listId = `warning-list-${index}`;
                     const chevronId = `chevron-${index}`;
+                    
                     
                     html += `
                         <div class="border-t border-yellow-200 dark:border-yellow-800">
@@ -873,7 +876,22 @@
                                     <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10l-3.293-3.293a1 1 0 111.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
                                 </svg>
                             </div>
-                            <div id="${listId}" class="warning-list">
+                            <div id="${listId}" class="warning-list">`;
+                            
+                    // Condición: Si es el grupo de 'Características (idValor e Principais)', añade el enlace DENTRO del warning-list.
+                    if (group.title.includes('Características (idValor e Principais)')) {
+                         // APLICAR CLASES text-gray-700 (Modo Claro) e dark:text-gray-300 (Modo Oscuro)
+                         html += `
+                            <p class="text-sm text-gray-700 mt-2 mb-2 px-1 dark:text-gray-500">
+                                Pode verificar ou revisar as características aqui: 
+                                <a href="https://api-br-open.navent.com/#!/inventario/caracteristicasPorTipoUsingGET_15" target="_blank" class="font-semibold underline text-indigo-700 dark:text-grey-400">
+                                    Caracteristicas na API
+                                </a>
+                            </p>
+                         `;
+                    }
+                    
+                    html += `
                                 <ul class="warnings">
                                     ${group.items.map(item => `<li>${item}</li>`).join('')}
                                 </ul>
