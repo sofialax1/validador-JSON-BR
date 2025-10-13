@@ -304,6 +304,16 @@
             "33",   // Lançamento horizontal
             "34"    // Lançamento vertical
         ]);
+        
+        // Mapeo de características principales y sus nombres alternativos (para facilitar la búsqueda y corrección)
+        const PRIMARY_FEATURES_MAP = [
+            { primary: 'SUPERFICIE_TOTAL', alternatives: ['AREA_TOTAL', 'MEDIDAS|SUPERFICIE_TOTAL'] },
+            { primary: 'AREA_UTIL', alternatives: ['SUPERFICIE_CUBIERTA', 'MEDIDAS|SUPERFICIE_CUBIERTA'] },
+            { primary: 'SUITE', alternatives: ['MEDIOS_BANOS', 'PRINCIPALES|MEDIOS_BANOS'] },
+            { primary: 'QUARTO', alternatives: ['HABITACIONES', 'PRINCIPALES|HABITACIONES'] },
+            { primary: 'VAGA', alternatives: ['GARAGE', 'PRINCIPALES|GARAGE'] }
+        ];
+
         // ------------------------------------------
         
         // Mensaje de estado inicial del drop-area
@@ -549,15 +559,63 @@
                 return warnings;
             };
             
-            const validateJSON = (data, isUnit = false, unitIndex = null) => {
-                const errors = [];
+            const findFeature = (caracteristicas, names) => {
+                if (!Array.isArray(caracteristicas)) return null;
+                
+                // Crear una lista única de todos los nombres (principal + alternativas)
+                const searchNames = [].concat(names.primary, names.alternatives).map(n => n.toUpperCase());
+
+                for (const feature of caracteristicas) {
+                    if (feature && feature.nombre) {
+                        const featureNameUpper = feature.nombre.toUpperCase();
+                        if (searchNames.includes(featureNameUpper)) {
+                            return feature;
+                        }
+                    }
+                }
+                return null;
+            };
+
+            const validateFeaturesPresence = (data, prefix) => {
                 const warnings = [];
-                const caracteristicasWarnings = [];
+                const corrections = [];
+                const caracteristicas = data.caracteristicas;
+
+                for (const featureMapping of PRIMARY_FEATURES_MAP) {
+                    const primaryName = featureMapping.primary;
+                    const foundFeature = findFeature(caracteristicas, featureMapping);
+                    
+                    if (!foundFeature) {
+                        // 1. Generar Warning
+                        const namesList = [primaryName, ...featureMapping.alternatives].join(', ');
+                        warnings.push({
+                            warning: `${prefix}A característica principal '${primaryName}' (ou uma de suas variações: ${namesList}) não foi encontrada ou está mal escrita.`,
+                            correction: `Será adicionada com o valor '0' por padrão.`
+                        });
+                        
+                        // 2. Preparar Correção: Adicionar la característica con idValor: '0'
+                        corrections.push({
+                            nombre: primaryName,
+                            idValor: "0",
+                            valor: "0",
+                        });
+                    }
+                }
+                
+                return { warnings, corrections };
+            };
+
+
+            const validateJSON = (data, isUnit = false, unitIndex = null) => {
+                let errors = [];
+                let warnings = [];
+                let caracteristicasWarnings = [];
                 const multimediaUbicacionWarnings = []; // Agrupación 2
                 const publicacionTipoWarnings = []; // Agrupación 3
                 
                 const caracteristicasErrors = []; // Errores agrupados de características
                 const preciosErrors = []; // Errores agrupados de precios
+                let featureCorrections = []; // Correcciones de características faltantes/mal escritas
 
                 const prefix = isUnit ? `Unidade ${unitIndex + 1}: ` : '';
 
@@ -601,12 +659,7 @@
 
                     // *** INICIO: Validación de Tipo de Desarrollo (Lançamento) ***
                     if (VALID_DEVELOPMENT_TYPE_IDS.has(String(idTipo))) {
-                        // O campo 'tipoDePropiedad.idTipo' é um desenvolvimento.
-                        // FALTA: O campo onde o ID do Lançamento (33 ou 34) é realmente armazenado.
-                        // Exemplo de campo faltante: data.tipoDeDesenvolvimento.idTipo
-                        
-                        // Esta validação deve ser expandida quando o usuário fornecer o campo exato.
-                        // Por enquanto, apenas checamos se o ID principal é de desenvolvimento.
+                        // Validación de Desarrollo pendiente de campo específico
                     }
                     // *** FIM: Validación de Tipo de Desarrollo (Lançamento) ***
 
@@ -658,6 +711,16 @@
                 
                 // Validar caracteristicas (Agrupación 1 - Warnings y Errores)
                 if (data.caracteristicas && Array.isArray(data.caracteristicas)) {
+                    
+                    // --- NUEVA VALIDACIÓN: Chequear presencia de características principales ---
+                    const featureValidationResult = validateFeaturesPresence(data, prefix);
+                    featureCorrections = featureValidationResult.corrections; // Guardar correcciones para aplicar después
+                    
+                    featureValidationResult.warnings.forEach(w => {
+                        caracteristicasWarnings.push(`${w.warning} <span class="correction-text">${w.correction}</span>`);
+                    });
+                    // --------------------------------------------------------------------------
+
                     data.caracteristicas.forEach((caracteristica, index) => {
                         // ERROR: Nombre obligatorio (Agrupación de Errores)
                         if (!('nombre' in caracteristica) || isValueEmpty(caracteristica.nombre)) {
@@ -667,7 +730,10 @@
                         // WARNING: idValor no obligatorio (Agrupación 1 - Warnings)
                         if (!('idValor' in caracteristica) || isValueEmpty(caracteristica.idValor)) {
                              const nombreCaracteristica = caracteristica.nombre || `Sem nome (Índice ${index + 1})`;
-                             caracteristicasWarnings.push(`${prefix}A característica '${nombreCaracteristica}' não tem 'idValor'. <span class="correction-text">Correção:</span> Será atribuído '0' como valor padrão.`);
+                             // Solo agregamos este warning si no es uno de los warnings de características principales
+                             if (!featureValidationResult.warnings.find(w => w.primary === nombreCaracteristica)) {
+                                caracteristicasWarnings.push(`${prefix}A característica '${nombreCaracteristica}' não tem 'idValor'. <span class="correction-text">Correção:</span> Será atribuído '0' como valor padrão.`);
+                             }
                         }
                     });
                 }
@@ -755,14 +821,15 @@
                 // 1. Características
                 if (caracteristicasWarnings.length > 0) {
                     groupedWarnings.push({
-                        title: `Características (idValor)`,
+                        title: `Características (idValor e Principais)`,
                         items: caracteristicasWarnings,
                         type: 'warnings'
                     });
                 }
                 
                 // Devolver errores no agrupados, y luego los arrays de objetos agrupados
-                return { errors: errors.concat(groupedErrors), warnings: warnings.concat(groupedWarnings) };
+                // También devolvemos las correcciones de características para ser aplicadas por applyCorrections
+                return { errors: errors.concat(groupedErrors), warnings: warnings.concat(groupedWarnings), featureCorrections: featureCorrections };
             };
             
             // Función para renderizar el desglose de ERRORES
@@ -857,6 +924,7 @@
                     let generalWarnings = [];
                     let groupedErrors = []; // Almacenará objetos {title, items}
                     let groupedWarnings = []; // Almacenará objetos {title, items}
+                    let allFeatureCorrections = []; // Almacena correcciones de features (solo nivel superior)
                     
                     // Re-habilitar Reiniciar, ya que el proceso de lectura terminó
                     resetBtn.disabled = false;
@@ -865,6 +933,7 @@
                         let parsedData = JSON.parse(fileContent);
 
                         const primaryResult = validateJSON(parsedData);
+                        allFeatureCorrections = allFeatureCorrections.concat(primaryResult.featureCorrections);
                         
                         // Define isDevelopment based on EITHER pub type OR units presence (FIX)
                         const isDevelopmentByPubType = parsedData.publicacion?.tipoDePublicacion === "Desarrollo" || parsedData.publicacion?.tipoDePublicacion === "DEVELOPMENT";
@@ -933,6 +1002,10 @@
                         const typeWarnings = validateTypes(parsedData, typeSchema);
                         generalWarnings = generalWarnings.concat(typeWarnings);
                         
+                        // --- Guardar correcciones y datos ---
+                        // Asociamos las correcciones de features al objeto parsedData para usarlas en applyCorrections
+                        parsedData._featureCorrections = allFeatureCorrections;
+                        
                         // --- Reportar y mostrar acciones ---
                         const summaryHTML = calculateSummary(parsedData);
                         analysisSummary.innerHTML = summaryHTML;
@@ -982,10 +1055,20 @@
                                 setStatusMessage(message, 'text-left');
                                 currentParsedData = parsedData;
                                 actionButtons.classList.remove('hidden');
-                                correctWarningsBtn.classList.remove('hidden');
+                                // Mostrar el botón de corregir solo si hay warnings
+                                if (generalWarnings.length > 0 || groupedWarnings.length > 0) {
+                                    correctWarningsBtn.classList.remove('hidden');
+                                } else {
+                                    correctWarningsBtn.classList.add('hidden'); 
+                                }
+                                
                                 downloadJsonBtn.classList.remove('hidden');
 
-                                const formattedJson = JSON.stringify(parsedData, null, 2);
+                                // Clonar el objeto para mostrar sin la clave interna de corrección
+                                const displayData = JSON.parse(JSON.stringify(parsedData));
+                                delete displayData._featureCorrections;
+                                
+                                const formattedJson = JSON.stringify(displayData, null, 2);
                                 jsonOutput.textContent = formattedJson;
                             }
                         } else {
@@ -1012,29 +1095,37 @@
 
             // --- Lógica de Corregir Advertencias (Punto 1b) ---
             const applyCorrections = (data) => {
-                // 1. Corregir publicador.emailAsesor (si está vacío)
+                
+                // 1. Aplicar correcciones de características faltantes
+                const corrections = data._featureCorrections || [];
+                if (corrections.length > 0) {
+                    if (!Array.isArray(data.caracteristicas)) {
+                        data.caracteristicas = [];
+                    }
+                    data.caracteristicas = data.caracteristicas.concat(corrections);
+                }
+                
+                // 2. Corregir publicador.emailAsesor (si está vacío)
                 if (data.publicador && isValueEmpty(data.publicador.emailAsesor)) {
                     data.publicador.emailAsesor = "Administrador";
                 }
 
-                // 2. Corregir publicacion.tipoDePublicacion (si está vacío)
+                // 3. Corregir publicacion.tipoDePublicacion (si está vacío)
                 if (data.publicacion && isValueEmpty(data.publicacion.tipoDePublicacion)) {
-                    // Si inferimos que es desarrollo por las unidades, no lo corregimos a SIMPLE aquí
                     const isDevelopmentByUnits = Array.isArray(data.unidades) && data.unidades.length > 0;
                     if (!isDevelopmentByUnits) {
                         data.publicacion.tipoDePublicacion = "SIMPLE";
                     } else {
-                        // Si tiene unidades, pero el campo estaba vacío, lo corregimos a Desarrollo para consistencia futura
                         data.publicacion.tipoDePublicacion = "Desarrollo"; 
                     }
                 }
                 
-                // 3. Corregir titulo (si es > 100 caracteres)
+                // 4. Corregir titulo (si es > 100 caracteres)
                 if (data.titulo && data.titulo.length > 100) {
                     data.titulo = data.titulo.substring(0, 100);
                 }
 
-                // 4. Corregir caracteristicas[].idValor (si está vacío)
+                // 5. Corregir caracteristicas[].idValor (si está vacío) - Se aplica a todas las features, incluyendo las recién añadidas
                 if (Array.isArray(data.caracteristicas)) {
                     data.caracteristicas.forEach(c => {
                         if (isValueEmpty(c.idValor)) {
@@ -1043,22 +1134,23 @@
                     });
                 }
 
-                // 5. Corregir precios[].moneda (si está vacío)
+                // 6. Corregir precios[].moneda (si está vacío)
                 if (Array.isArray(data.precios)) {
                     data.precios.forEach(p => {
                         if (isValueEmpty(p.moneda)) {
-                            // Suponemos una moneda por defecto común, ej., 'USD' o 'BRL'
                             p.moneda = "BRL"; 
                         }
                     });
                 }
 
-                // 6. Aplicar correcciones a unidades si es Desarrollo
+                // 7. Aplicar correcciones a unidades si es Desarrollo
                 const isDevelopment = data.publicacion?.tipoDePublicacion === "Desarrollo" || data.publicacion?.tipoDePublicacion === "DEVELOPMENT";
                 if (isDevelopment && Array.isArray(data.unidades)) {
                     data.unidades.forEach(unit => applyCorrections(unit));
                 }
                 
+                // Limpiar la clave temporal antes de devolver
+                delete data._featureCorrections; 
                 return data;
             };
 
@@ -1070,18 +1162,28 @@
                     const validationResult = validateJSON(correctedData);
                     
                     if (validationResult.errors.length > 0) {
-                         // Esto no debería pasar si las correcciones son correctas, pero es un fallback
                          setStatusMessage('Erro: A correção automática introduziu ou não resolveu erros críticos.', 'text-red-600');
-                    } else if (validationResult.warnings.length === 0) {
-                        currentParsedData = correctedData; // Sobrescribir con el JSON corregido
-                        jsonOutput.textContent = JSON.stringify(currentParsedData, null, 2);
-                        setStatusMessage('Arquivo JSON carregado e validado com sucesso. A estrutura está correta.', 'text-green-600');
-                        correctWarningsBtn.classList.add('hidden'); // Ocultar el botón
                     } else {
-                        // Si quedan advertencias (las que no tienen corrección auto), simplemente actualizar
-                        currentParsedData = correctedData;
-                        jsonOutput.textContent = JSON.stringify(currentParsedData, null, 2);
-                        setStatusMessage('Avisos corrigidos. Ainda restam avisos informativos (sem correção automática).', 'text-yellow-600');
+                        currentParsedData = correctedData; // Sobrescribir con el JSON corregido
+                        
+                        const displayData = JSON.parse(JSON.stringify(currentParsedData));
+                        delete displayData._featureCorrections;
+                        jsonOutput.textContent = JSON.stringify(displayData, null, 2);
+
+                        if (validationResult.warnings.length === 0) {
+                             setStatusMessage('Arquivo JSON corrigido e validado com sucesso. Não restam avisos automáticos.', 'text-green-600');
+                             correctWarningsBtn.classList.add('hidden'); 
+                        } else {
+                            // Si quedan advertencias (las que no tienen corrección auto), simplemente actualizar
+                            setStatusMessage('Avisos corrigidos. Ainda restam avisos informativos (sem correção automática).', 'text-yellow-600');
+                        }
+                        
+                        // Recalcular el resumen después de la corrección
+                        const summaryHTML = calculateSummary(currentParsedData);
+                        analysisSummary.innerHTML = summaryHTML;
+
+                        // Re-ejecutar el análisis para mostrar los mensajes actualizados (opcional, pero garantiza que la lista de warnings esté limpia)
+                        // processFile(new File([JSON.stringify(currentParsedData)], "corrected.json", { type: 'application/json' }));
                     }
                 }
             });
@@ -1090,7 +1192,11 @@
             // --- Lógica de Descargar JSON (Punto 3c) ---
             downloadJsonBtn.addEventListener('click', () => {
                 if (currentParsedData) {
-                    const dataStr = JSON.stringify(currentParsedData, null, 2);
+                    // Clonar y eliminar la clave interna antes de descargar
+                    const dataToDownload = JSON.parse(JSON.stringify(currentParsedData));
+                    delete dataToDownload._featureCorrections;
+                    
+                    const dataStr = JSON.stringify(dataToDownload, null, 2);
                     const blob = new Blob([dataStr], { type: 'application/json' });
                     const url = URL.createObjectURL(blob);
                     
