@@ -590,7 +590,7 @@
                         // 1. Generar Warning
                         const namesList = [primaryName, ...featureMapping.alternatives].join(', ');
                         warnings.push({
-                            warning: `${prefix}A característica principal '${primaryName}' (ou uma de suas variações: ${namesList}) não foi encontrada ou está mal escrita.`,
+                            warning: `${prefix}A característica principal '${primaryName}' não foi encontrada ou está mal escrita.`,
                             correction: `Será adicionada com o valor '0' por padrão.`
                         });
                         
