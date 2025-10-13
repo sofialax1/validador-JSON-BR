@@ -188,6 +188,44 @@
         .toggle-checkbox:checked + .toggle-label .toggle-thumb {
             transform: translateX(100%);
         }
+        
+        /* ESTILOS DE BOTONES PERSONALIZADOS */
+        .btn-primary {
+            background-color: #5846f4; /* Morado/Índigo más oscuro y vibrante */
+            color: white;
+            padding: 0.5rem 1rem; /* Modificado: py-2 px-4 */
+            border-radius: 0.5rem; /* Esquinas redondeadas */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            font-weight: bold;
+            transition: background-color 0.15s ease-in-out;
+        }
+        .btn-primary:hover {
+            background-color: #6d58f6; /* Ligeramente más claro al pasar el ratón */
+        }
+
+        .btn-secondary {
+            border: 2px solid #5846f4;
+            color: #5846f4;
+            background-color: transparent;
+            padding: 0.5rem 1rem; /* Modificado: py-2 px-4 */
+            border-radius: 0.5rem;
+            font-weight: bold;
+            transition: all 0.15s ease-in-out;
+        }
+        .btn-secondary:hover {
+            background-color: #eef2ff; /* Azul muy claro al pasar el ratón */
+        }
+        
+        /* ESTILO PARA BOTONES DESHABILITADOS */
+        .btn-primary:disabled {
+            background-color: #9ca3af; /* gray-400 */
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+        .dark .btn-primary:disabled {
+            background-color: #4b5563; /* gray-600 */
+        }
+
     </style>
 </head>
 <body class="flex items-center justify-center min-h-screen p-6">
@@ -206,11 +244,23 @@
         
         <!-- Área de Drag and Drop -->
         <div id="drop-area" class="drop-area mb-6">
-            <p class="text-gray-500 dark:text-gray-400">Arraste e solte o arquivo JSON aqui, ou</p>
-            <label for="json-file-input" class="inline-block text-sm font-semibold text-indigo-700 mt-2 cursor-pointer hover:underline">
-                Selecionar arquivo JSON
-            </label>
+            <span id="drop-message-content">
+                <p class="text-gray-500 dark:text-gray-400">Arraste e solte o arquivo JSON aqui, ou</p>
+                <label for="json-file-input" class="inline-block text-sm font-semibold text-indigo-700 mt-2 cursor-pointer hover:underline">
+                    Selecionar arquivo JSON
+                </label>
+            </span>
             <input type="file" id="json-file-input" accept=".json" class="hidden">
+        </div>
+        
+        <!-- Contenedor de Botones de Control (Visible siempre) -->
+        <div id="control-buttons" class="flex justify-center space-x-4 mb-6">
+            <button id="analyze-btn" class="btn-primary" disabled>
+                Analisar Arquivo
+            </button>
+            <button id="reset-btn" class="btn-secondary">
+                Reiniciar
+            </button>
         </div>
         
         <div id="status-message" class="text-center font-medium mb-4 text-sm"></div>
@@ -221,7 +271,7 @@
             <div id="analysis-summary" class="text-sm text-blue-700"></div>
         </div>
 
-        <!-- Contenedor de Botones de Acción -->
+        <!-- Contenedor de Botones de Acción (Corregir y Descargar) -->
         <div id="action-buttons" class="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-3 mb-6 hidden">
             <button id="correct-warnings-btn" class="bg-yellow-500 text-white font-bold py-2 px-4 rounded-full shadow-md hover:bg-yellow-600 transition duration-150 flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-8a1 1 0 102 0V7a1 1 0 10-2 0v3zm0 4a1 1 0 102 0v-1a1 1 0 10-2 0v1z" clip-rule="evenodd" /></svg>
@@ -235,31 +285,60 @@
 
 
         <div class="bg-gray-50 p-4 rounded-lg">
-            <h2 class="text-lg font-semibold text-gray-600 mb-2 dark:text-gray-500">Conteúdo do Arquivo:</h2>
+            <h2 class="text-lg font-semibold text-black mb-2 dark:text-gray600">Conteúdo do Arquivo:</h2>
             <pre id="json-output"></pre>
         </div>
     </div>
 
     <script>
+        // --- CONSTANTES DE VALIDACIÓN ---
+        const VALID_PROPERTY_TYPE_IDS = new Set([
+            "1005", // Comercial
+            "2",    // Apartamento
+            "1",    // Casa
+            "1004", // Rurais (Rural)
+            "1003"  // Terreno
+        ]);
+        
+        const VALID_DEVELOPMENT_TYPE_IDS = new Set([
+            "33",   // Lançamento horizontal
+            "34"    // Lançamento vertical
+        ]);
+        // ------------------------------------------
+        
+        // Mensaje de estado inicial del drop-area
+        const initialDropMessage = `
+            <p class="text-gray-500 dark:text-gray-400">Arraste e solte o arquivo JSON aqui, ou</p>
+            <label for="json-file-input" class="inline-block text-sm font-semibold text-indigo-700 mt-2 cursor-pointer hover:underline">
+                Selecionar arquivo JSON
+            </label>
+        `;
+
         document.addEventListener('DOMContentLoaded', () => {
             const jsonFileInput = document.getElementById('json-file-input');
             const jsonOutput = document.getElementById('json-output');
             const statusMessage = document.getElementById('status-message');
             const dropArea = document.getElementById('drop-area');
+            const dropMessageContent = document.getElementById('drop-message-content'); // NUEVO ID
             const summarySection = document.getElementById('summary-section');
             const analysisSummary = document.getElementById('analysis-summary');
             const actionButtons = document.getElementById('action-buttons');
             const correctWarningsBtn = document.getElementById('correct-warnings-btn');
             const downloadJsonBtn = document.getElementById('download-json-btn');
             const darkModeToggle = document.getElementById('dark-mode-toggle');
+            
+            // --- NUEVOS ELEMENTOS ---
+            const analyzeBtn = document.getElementById('analyze-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            let selectedFile = null; // Almacena el archivo para análisis diferido
+            // ------------------------
 
             let currentParsedData = null; // Almacena el JSON válido para corrección/descarga
 
-            // --- Lógica de Modo Oscuro (NUEVO) ---
+            // --- Lógica de Modo Oscuro ---
             const body = document.body;
             const toggleThumb = document.querySelector('.toggle-thumb');
             
-            // Função para aplicar ou quitar el modo oscuro
             const toggleDarkMode = (isDark) => {
                 if (isDark) {
                     body.classList.add('dark');
@@ -273,19 +352,15 @@
                 darkModeToggle.checked = isDark;
             };
 
-            // Comprobar la preferencia almacenada al cargar
             const savedTheme = localStorage.getItem('theme');
             const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             
             if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
                 toggleDarkMode(true);
             } else {
-                // Asegura que el estado inicial sea light si no hay preferencia oscura
                 toggleDarkMode(false);
             }
 
-
-            // Listener del switch
             darkModeToggle.addEventListener('change', () => {
                 toggleDarkMode(darkModeToggle.checked);
             });
@@ -300,8 +375,24 @@
                 statusMessage.innerHTML = message;
                 statusMessage.className = `text-center font-medium mb-4 text-sm ${colorClass}`;
             };
+            
+            // --- Lógica de Reiniciar la Aplicación (NUEVO) ---
+            const resetApp = () => {
+                selectedFile = null;
+                jsonFileInput.value = ''; // Limpiar el input de tipo file
+                jsonOutput.textContent = '';
+                currentParsedData = null;
+                summarySection.classList.add('hidden');
+                actionButtons.classList.add('hidden');
+                
+                // RESTAURAR ESTADO INICIAL
+                analyzeBtn.disabled = true; 
+                setStatusMessage('', 'text-gray-500'); // Limpiar mensaje de estado
+                dropMessageContent.innerHTML = initialDropMessage; // Restaurar mensaje del drop-area
+            };
+            // ------------------------------------------------
 
-            // --- Lógica de Drag and Drop (Punto 1c) ---
+            // --- Lógica de Drag and Drop ---
             ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
                 dropArea.addEventListener(eventName, preventDefaults, false);
             });
@@ -325,12 +416,62 @@
                 const dt = e.dataTransfer;
                 const files = dt.files;
                 if (files.length) {
-                    // Simula la selección manual del archivo para mantener la lógica existente
-                    jsonFileInput.files = files;
-                    jsonFileInput.dispatchEvent(new Event('change'));
+                    // Llama al manejador de selección para actualizar el estado
+                    handleFileSelection(files[0]);
                 }
             }
             // --- Fin Lógica de Drag and Drop ---
+
+            // --- Manejador de selección de archivo (MODIFICADO para diferir el análisis) ---
+            const handleFileSelection = (file) => {
+                if (!file) return resetApp();
+
+                if (file.type !== 'application/json') {
+                    setStatusMessage('Erro: Por favor, carregue um arquivo .json válido.', 'text-red-600');
+                    dropMessageContent.innerHTML = initialDropMessage; // Restaurar mensaje si hay error
+                    analyzeBtn.disabled = true;
+                    return;
+                }
+                
+                selectedFile = file;
+                
+                // --- MOSTRAR NOMBRE DEL ARCHIVO EN DROP-AREA (NUEVO) ---
+                dropMessageContent.innerHTML = `
+                    <p class="text-blue-600 font-semibold"> ${file.name}</p>
+                    <p class="text-gray-500 dark:text-gray-400">Carregado com sucesso. Clique em 'Analisar Arquivo' para iniciar.</p>
+                `;
+                // ----------------------------------------------------
+
+                // Mostrar el nombre del archivo en el mensaje de estado
+                setStatusMessage(`Arquivo: ${file.name} pronto para análise. Clique em 'Analisar Arquivo'.`, 'text-indigo-600');
+                
+                // HABILITAR BOTÓN DE ANÁLISIS
+                analyzeBtn.disabled = false;
+                
+                // Limpiar áreas de resultados anteriores
+                jsonOutput.textContent = '';
+                summarySection.classList.add('hidden');
+                actionButtons.classList.add('hidden');
+                currentParsedData = null;
+            };
+
+            jsonFileInput.addEventListener('change', (event) => {
+                handleFileSelection(event.target.files[0]);
+            });
+
+            // --- Handler del botón Analizar Arquivo (NUEVO) ---
+            analyzeBtn.addEventListener('click', () => {
+                if (selectedFile) {
+                    processFile(selectedFile); // Inicia el análisis
+                } else {
+                    setStatusMessage('Nenhum arquivo JSON para analisar.', 'text-red-600');
+                }
+            });
+
+            // --- Handler del botón Reiniciar (NUEVO) ---
+            resetBtn.addEventListener('click', resetApp);
+            // ---------------------------------------------------
+
 
             // Función de ayuda para calcular el resumen (Punto 3a)
             const calculateSummary = (data) => {
@@ -450,9 +591,25 @@
 
                 // Validar campos anidados (Errores No Agrupados)
                 if (data.tipoDePropiedad) {
-                    if (!('idTipo' in data.tipoDePropiedad) || isValueEmpty(data.tipoDePropiedad.idTipo)) {
-                        errors.push(`${prefix}A chave obrigatória 'idTipo' dentro de 'tipoDePropiedad' não existe ou está vazia.`);
+                    const idTipo = data.tipoDePropiedad.idTipo;
+                    
+                    if (!('idTipo' in data.tipoDePropiedad) || isValueEmpty(idTipo)) {
+                        errors.push(`${prefix}A chave obrigatória 'idTipo' dentro de 'tipoDePropriedad' não existe ou está vazia.`);
+                    } else if (!VALID_PROPERTY_TYPE_IDS.has(String(idTipo))) { // VALIDACIÓN TIPO DE PROPIEDAD
+                         errors.push(`${prefix}Erro: O 'idTipo' (${idTipo}) dentro de 'tipoDePropriedade' não é um tipo de propriedade válido para o portal. Por favor, corrija.`);
                     }
+
+                    // *** INICIO: Validación de Tipo de Desarrollo (Lançamento) ***
+                    if (VALID_DEVELOPMENT_TYPE_IDS.has(String(idTipo))) {
+                        // O campo 'tipoDePropiedad.idTipo' é um desenvolvimento.
+                        // FALTA: O campo onde o ID do Lançamento (33 ou 34) é realmente armazenado.
+                        // Exemplo de campo faltante: data.tipoDeDesenvolvimento.idTipo
+                        
+                        // Esta validação deve ser expandida quando o usuário fornecer o campo exato.
+                        // Por enquanto, apenas checamos se o ID principal é de desenvolvimento.
+                    }
+                    // *** FIM: Validación de Tipo de Desarrollo (Lançamento) ***
+
                 } else {
                     errors.push(`${prefix}A chave obrigatória 'tipoDePropiedad' não existe.`);
                 }
@@ -685,21 +842,11 @@
 
 
             const processFile = (file) => {
-                if (!file) {
-                    setStatusMessage('Nenhum arquivo foi selecionado.', 'text-gray-500');
-                    jsonOutput.textContent = '';
-                    actionButtons.classList.add('hidden');
-                    summarySection.classList.add('hidden');
-                    return;
-                }
-
-                if (file.type !== 'application/json') {
-                    setStatusMessage('Erro: Por favor, carregue um arquivo .json válido.', 'text-red-600');
-                    jsonOutput.textContent = '';
-                    actionButtons.classList.add('hidden');
-                    summarySection.classList.add('hidden');
-                    return;
-                }
+                
+                // Mostrar mensaje de análisis y deshabilitar botones
+                setStatusMessage('Analisando arquivo... Por favor, aguarde.', 'text-blue-600');
+                analyzeBtn.disabled = true;
+                resetBtn.disabled = true;
 
                 const reader = new FileReader();
 
@@ -710,6 +857,9 @@
                     let generalWarnings = [];
                     let groupedErrors = []; // Almacenará objetos {title, items}
                     let groupedWarnings = []; // Almacenará objetos {title, items}
+                    
+                    // Re-habilitar Reiniciar, ya que el proceso de lectura terminó
+                    resetBtn.disabled = false;
 
                     try {
                         let parsedData = JSON.parse(fileContent);
@@ -787,6 +937,7 @@
                         const summaryHTML = calculateSummary(parsedData);
                         analysisSummary.innerHTML = summaryHTML;
                         summarySection.classList.remove('hidden');
+                        analyzeBtn.disabled = true; // Deshabilitar el análisis después de la ejecución
 
                         if (allErrors.length > 0 || groupedErrors.length > 0 || generalWarnings.length > 0 || groupedWarnings.length > 0) {
                             let message = '';
@@ -850,18 +1001,14 @@
                     } catch (error) {
                         setStatusMessage('Erro: O arquivo não é um JSON válido.', 'text-red-600');
                         jsonOutput.textContent = '';
-                        actionButtons.classList.add('hidden');
                         summarySection.classList.add('hidden');
+                        actionButtons.classList.add('hidden');
+                        analyzeBtn.disabled = true;
                         console.error('Erro ao analisar o JSON:', error);
                     }
                 };
                 reader.readAsText(file);
             };
-
-            jsonFileInput.addEventListener('change', (event) => {
-                processFile(event.target.files[0]);
-            });
-
 
             // --- Lógica de Corregir Advertencias (Punto 1b) ---
             const applyCorrections = (data) => {
@@ -959,6 +1106,9 @@
                     setStatusMessage('Erro: Não há dados válidos para baixar.', 'text-red-600');
                 }
             });
+            
+            // Inicializar el mensaje de drop-area
+            dropMessageContent.innerHTML = initialDropMessage;
 
         });
     </script>
