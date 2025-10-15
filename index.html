@@ -240,7 +240,6 @@
         </div>
 
         <h1 class="text-3xl font-bold text-center text-black mb-4">Validador JSON</h1>
-        <p class="text-center text-gray-800 mb-2">Esta ferramenta valida a estrutura do seu arquivo JSON, verificando campos obrigatórios, tipos de dados e atribuição de valores padrão.</p>
         <p class="text-center text-gray-800 mb-6">Carregue (ou arraste) um arquivo .json para validar a estrutura, tipos de dados e obter uma análise.</p>
         
         <!-- Área de Drag and Drop -->
@@ -286,7 +285,7 @@
 
 
         <div class="bg-gray-50 p-4 rounded-lg">
-            <h2 class="text-lg font-semibold text-black mb-2 dark:text-gray-600">Conteúdo do Arquivo:</h2>
+            <h2 class="text-lg font-semibold text-gray-600 mb-2 dark:text-white">Conteúdo do Arquivo:</h2>
             <pre id="json-output"></pre>
         </div>
     </div>
@@ -587,10 +586,9 @@
                     const foundFeature = findFeature(caracteristicas, featureMapping);
                     
                     if (!foundFeature) {
-                        // 1. Generar Warning
-                        const namesList = [primaryName, ...featureMapping.alternatives].join(', ');
+                        // 1. Generar Warning - Mensaje simplificado según la solicitud
                         warnings.push({
-                            warning: `${prefix}A característica principal '${primaryName}' não foi encontrada ou está mal escrita.`,
+                            warning: `${prefix}A característica principal '${primaryName}' (e nenhum de seus alias) não foi encontrada ou está mal escrita.`,
                             correction: `Será adicionada com o valor '0' por padrão.`
                         });
                         
@@ -766,7 +764,7 @@
                 if (data.multimedia) {
                     // Advertencia por falta de planos
                     if (!data.multimedia.planos || (Array.isArray(data.multimedia.planos) && data.multimedia.planos.length === 0)) {
-                        multimediaUbicacionWarnings.push(`O anúncio não tem plantas.`);
+                        multimediaUbicacionWarnings.push(`O anúncio não tem planos.`);
                     }
                     // Advertencia por falta de imágenes (ya existía)
                     if (!data.multimedia.imagenes || (Array.isArray(data.multimedia.imagenes) && data.multimedia.imagenes.length === 0)) {
@@ -882,10 +880,10 @@
                     if (group.title.includes('Características (idValor e Principais)')) {
                          // APLICAR CLASES text-gray-700 (Modo Claro) e dark:text-gray-300 (Modo Oscuro)
                          html += `
-                            <p class="text-sm text-gray-700 mt-2 mb-2 px-1 dark:text-gray-500">
+                            <p class="text-sm text-gray-700 mt-2 mb-2 px-1 dark:text-gray-300">
                                 Pode verificar ou revisar as características aqui: 
-                                <a href="https://api-br-open.navent.com/#!/inventario/caracteristicasPorTipoUsingGET_15" target="_blank" class="font-semibold underline text-indigo-700 dark:text-grey-400">
-                                    Caracteristicas na API
+                                <a href="https://api-br-open.navent.com/#!/inventario/caracteristicasPorTipoUsingGET_15" target="_blank" class="font-semibold underline text-indigo-600 dark:text-indigo-400">
+                                    Documentação de Características
                                 </a>
                             </p>
                          `;
